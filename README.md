@@ -68,4 +68,8 @@ sudo cp target/*.war /opt/tomcat10/webapps/
 sudo /opt/tomcat10/bin/shutdown.sh
 sudo /opt/tomcat10/bin/startup.sh
 
+http://3.234.244.169:8080//economic-times-app/  : To view app on ec2
+
+
+
 
