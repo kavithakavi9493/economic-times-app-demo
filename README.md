@@ -63,8 +63,9 @@ sudo chmod +x /opt/tomcat10/bin/*.sh
 sudo /opt/tomcat10/bin/startup.sh
 ==============================================================================================================================================================================
 
-
-
-
+mvn clean package
+sudo cp target/*.war /opt/tomcat10/webapps/
+sudo /opt/tomcat10/bin/shutdown.sh
 sudo /opt/tomcat10/bin/startup.sh
+
 
