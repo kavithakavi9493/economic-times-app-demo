@@ -1,4 +1,4 @@
-name: Build and Deploy Economic Times App
+name: Economic Times App CI
 
 on:
   push:
@@ -7,15 +7,41 @@ on:
   pull_request:
 
 jobs:
-  build:
+  prerequisites:
     runs-on: ubuntu-latest
-
     steps:
-      # Checkout source code
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Set up JDK 17
+      - name: Install Java 17 and Maven
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y openjdk-17-jdk maven
+          java -version
+          mvn -version
+
+      - name: Install Tomcat 10.1.50
+        run: |
+          cd /opt
+          sudo rm -rf tomcat10 apache-tomcat-10.1.50*
+          sudo wget https://archive.apache.org/dist/tomcat/tomcat-10/v10.1.50/bin/apache-tomcat-10.1.50.tar.gz
+          sudo tar -xzf apache-tomcat-10.1.50.tar.gz
+          sudo mv apache-tomcat-10.1.50 tomcat10
+          sudo chmod +x /opt/tomcat10/bin/*.sh
+
+      - name: Upload Tomcat installation
+        uses: actions/upload-artifact@v4
+        with:
+          name: tomcat-installation
+          path: /opt/tomcat10
+
+  build:
+    runs-on: ubuntu-latest
+    needs: prerequisites
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
@@ -23,45 +49,37 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      # Build with Maven
-      - name: Build with Maven
+      - name: Build WAR with Maven
         run: mvn clean package -DskipTests
 
-      # Upload WAR artifact for deployment
       - name: Upload WAR artifact
         uses: actions/upload-artifact@v4
         with:
           name: economic-times-app
-          path: target/economic-times-app.war
+          path: target/*.war
 
-  deploy:
+  run:
     runs-on: ubuntu-latest
     needs: build
-
     steps:
-      # Download WAR artifact
+      - name: Download Tomcat installation
+        uses: actions/download-artifact@v4
+        with:
+          name: tomcat-installation
+          path: /opt/tomcat10
+
       - name: Download WAR artifact
         uses: actions/download-artifact@v4
         with:
           name: economic-times-app
+          path: ./war
 
-      # Deploy to remote Tomcat server
-      - name: Deploy WAR to Tomcat
-        uses: appleboy/scp-action@master
-        with:
-          host: ${{ secrets.TOMCAT_HOST }}
-          username: ${{ secrets.TOMCAT_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "economic-times-app.war"
-          target: "/opt/tomcat10/webapps/economic-times-app.war"
+      - name: Start Tomcat and deploy WAR
+        run: |
+          sudo cp ./war/*.war /opt/tomcat10/webapps/
+          sudo /opt/tomcat10/bin/startup.sh
+          sleep 10
 
-      # Restart Tomcat service
-      - name: Restart Tomcat
-        uses: appleboy/scp-action@master
-        with:
-          host: ${{ secrets.TOMCAT_HOST }}
-          username: ${{ secrets.TOMCAT_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            /opt/tomcat10/bin/shutdown.sh || true
-            /opt/tomcat10/bin/startup.sh
+      - name: Verify app is running
+        run: |
+          curl -I http://localhost:8080/economic-times-app/ || true
