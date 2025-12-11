@@ -1,4 +1,4 @@
-name: Economic Time App CI
+name: Economic Time App CI  
 on:
   push:
     branches: [ main ]
